@@ -8,6 +8,7 @@ import { expect, test } from '@playwright/test';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = resolve(currentDirectory, '..');
+const mainEntry = resolve(desktopRoot, 'dist/electron/main/index.js');
 
 test.skip(
   process.platform !== 'darwin' && process.env.CI !== 'true',
@@ -25,7 +26,7 @@ test('opens dictionary sections from the top menu', async () => {
 async function runElectronSmoke(
   userDataDirectory: string
 ): Promise<{ exitCode: number | null; output: string }> {
-  const child = spawn(electronPath, [desktopRoot, '--no-sandbox'], {
+  const child = spawn(electronPath, ['--no-sandbox', mainEntry], {
     cwd: desktopRoot,
     env: {
       ...process.env,
