@@ -1,0 +1,31 @@
+{
+  "name": "bochki-schedule",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "build": "pnpm --filter @bochki/domain build && pnpm --filter @bochki/storage build && pnpm --filter @bochki/ui build && pnpm --filter @bochki/desktop build",
+    "dev": "pnpm --filter @bochki/desktop dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "prepare": "husky",
+    "test:e2e": "pnpm --filter @bochki/desktop test:e2e",
+    "test:unit": "pnpm -r test:unit",
+    "typecheck": "pnpm --filter @bochki/domain build && pnpm --filter @bochki/storage build && pnpm --filter @bochki/ui build && pnpm -r typecheck",
+    "package:mac": "pnpm --filter @bochki/desktop package:mac"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.29.0",
+    "@types/node": "^22.15.32",
+    "eslint": "^9.29.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.34.1",
+    "vitest": "^3.2.4"
+  }
+}

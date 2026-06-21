@@ -1,0 +1,54 @@
+{
+  "name": "@bochki/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/electron/main/index.js",
+  "scripts": {
+    "build": "pnpm run build:renderer && pnpm run build:electron",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:renderer": "vite build",
+    "dev": "node scripts/dev.mjs",
+    "package:mac": "electron-builder --mac --publish never",
+    "test:e2e": "pnpm build && playwright test",
+    "test:unit": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit"
+  },
+  "dependencies": {
+    "@bochki/domain": "workspace:*",
+    "@bochki/storage": "workspace:*",
+    "@bochki/ui": "workspace:*",
+    "@primevue/themes": "^4.3.5",
+    "primevue": "^4.3.5",
+    "vue": "^3.5.16",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.1",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "autoprefixer": "^10.4.21",
+    "electron": "^35.5.1",
+    "electron-builder": "^26.0.12",
+    "happy-dom": "^17.6.3",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.3.5"
+  },
+  "build": {
+    "appId": "ru.bochki.schedule",
+    "productName": "Расписание Бочки",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    }
+  }
+}

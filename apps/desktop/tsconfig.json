@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "types": ["vite/client"]
+  },
+  "include": ["src/renderer/**/*.ts", "vite.config.ts"],
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/storage" },
+    { "path": "../../packages/ui" }
+  ]
+}
