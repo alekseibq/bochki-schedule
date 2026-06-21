@@ -11,6 +11,7 @@
 ## Правила по вкладу в репозиторий
 
 - [agent-rules/CONTRIBUTING.md](./agent-rules/CONTRIBUTING.md) - загружать, когда задача касается внесения изменений в код, структуры коммитов, Pull Request, веток, review-процесса и правил внесения правок в репозиторий.
+- [agent-rules/RELEASE-WORKFLOW.md](./agent-rules/RELEASE-WORKFLOW.md) - загружать, когда задача касается CI/CD, release workflow, ручного QA desktop-приложения, GitHub Actions artifacts/Releases и доставки проверенных артефактов заказчику.
 
 ## Правила по разрешениям и рабочему циклу агента
 
