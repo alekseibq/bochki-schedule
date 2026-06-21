@@ -24,11 +24,13 @@ test('opens dictionary sections from the top menu', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('home-page')).toBeVisible();
 
-  await page.getByRole('menuitem', { name: 'Справочники' }).hover();
-  await page.getByRole('menuitem', { name: 'Участники' }).click();
+  await page.getByText('Справочники', { exact: true }).hover();
+  await page.getByText('Справочники', { exact: true }).click();
+  await page.getByText('Участники', { exact: true }).click();
   await expect(page.getByTestId('participants-page')).toBeVisible();
 
-  await page.getByRole('menuitem', { name: 'Справочники' }).hover();
-  await page.getByRole('menuitem', { name: 'Сопровождающие' }).click();
+  await page.getByText('Справочники', { exact: true }).hover();
+  await page.getByText('Справочники', { exact: true }).click();
+  await page.getByText('Сопровождающие', { exact: true }).click();
   await expect(page.getByTestId('trainers-page')).toBeVisible();
 });
