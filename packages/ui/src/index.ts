@@ -69,6 +69,10 @@ export const AppShell = defineComponent({
     dataError: {
       type: String as PropType<string | null>,
       default: null
+    },
+    dataInfo: {
+      type: String as PropType<string | null>,
+      default: null
     }
   },
   setup(props) {
@@ -120,7 +124,22 @@ export const AppShell = defineComponent({
                 )
               ]
             )
-          : null,
+          : props.dataInfo
+            ? h(
+                'div',
+                {
+                  class: 'mx-auto max-w-6xl px-6 pt-4',
+                  'data-testid': 'data-info-banner'
+                },
+                [
+                  h(
+                    Message,
+                    { severity: 'info', closable: false },
+                    { default: () => props.dataInfo }
+                  )
+                ]
+              )
+            : null,
         h('main', { class: 'mx-auto max-w-6xl' }, [h(RouterView)])
       ]);
   }

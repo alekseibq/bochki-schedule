@@ -47,6 +47,46 @@ describe('AppShell', () => {
     );
   });
 
+  it('renders a data info banner', async () => {
+    const router = createTestRouter();
+    await router.push(ROUTES.home);
+    await router.isReady();
+
+    const wrapper = mount(AppShell, {
+      props: { dataInfo: 'Создан новый пустой файл данных.' },
+      global: {
+        plugins: [[PrimeVuePlugin, { theme: { preset: Aura } }], router]
+      }
+    });
+
+    expect(wrapper.get('[data-testid="data-info-banner"]').text()).toContain(
+      'Создан новый пустой файл данных.'
+    );
+  });
+
+  it('prioritizes the data error banner over the info banner', async () => {
+    const router = createTestRouter();
+    await router.push(ROUTES.home);
+    await router.isReady();
+
+    const wrapper = mount(AppShell, {
+      props: {
+        dataError: 'Файл данных поврежден.',
+        dataInfo: 'Создан новый пустой файл данных.'
+      },
+      global: {
+        plugins: [[PrimeVuePlugin, { theme: { preset: Aura } }], router]
+      }
+    });
+
+    expect(wrapper.get('[data-testid="data-error-banner"]').text()).toContain(
+      'Файл данных поврежден.'
+    );
+    expect(wrapper.find('[data-testid="data-info-banner"]').exists()).toBe(
+      false
+    );
+  });
+
   it('defines participant and trainer dictionary routes', () => {
     expect(appRoutes.map((route) => route.path)).toEqual([
       ROUTES.home,
