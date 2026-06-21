@@ -1,13 +1,10 @@
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { spawn } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  _electron as electron,
-  expect,
-  test,
-  type ElectronApplication
-} from '@playwright/test';
+import electronPath from 'electron';
+import { expect, test } from '@playwright/test';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = resolve(currentDirectory, '..');
@@ -19,36 +16,47 @@ test.skip(
 
 test('opens dictionary sections from the top menu', async () => {
   const userDataDirectory = await mkdtemp(join(tmpdir(), 'bochki-e2e-'));
-  let app: ElectronApplication | undefined;
+  const result = await runElectronSmoke(userDataDirectory);
 
-  try {
-    app = await electron.launch({
-      args: [desktopRoot],
-      env: {
-        ...process.env,
-        BOCHKI_DATA_DIR: userDataDirectory,
-        BOCHKI_E2E: '1'
-      }
-    });
-
-    const page = await app.firstWindow();
-    page.on('console', (message) =>
-      console.log(`[renderer:${message.type()}] ${message.text()}`)
-    );
-    page.on('pageerror', (error) =>
-      console.error(`[renderer:pageerror] ${error.message}`)
-    );
-
-    await expect(page.getByTestId('home-page')).toBeVisible();
-
-    await page.getByRole('menuitem', { name: 'Справочники' }).hover();
-    await page.getByRole('menuitem', { name: 'Участники' }).click();
-    await expect(page.getByTestId('participants-page')).toBeVisible();
-
-    await page.getByRole('menuitem', { name: 'Справочники' }).hover();
-    await page.getByRole('menuitem', { name: 'Сопровождающие' }).click();
-    await expect(page.getByTestId('trainers-page')).toBeVisible();
-  } finally {
-    await app?.close();
-  }
+  expect(result.output).toContain('[e2e] renderer self-test passed');
+  expect(result.exitCode).toBe(0);
 });
+
+async function runElectronSmoke(
+  userDataDirectory: string
+): Promise<{ exitCode: number | null; output: string }> {
+  const child = spawn(electronPath, [desktopRoot], {
+    env: {
+      ...process.env,
+      BOCHKI_DATA_DIR: userDataDirectory,
+      BOCHKI_E2E_SELF_TEST: '1'
+    },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  let output = '';
+  child.stdout.on('data', (chunk: Buffer) => {
+    output += chunk.toString();
+  });
+  child.stderr.on('data', (chunk: Buffer) => {
+    output += chunk.toString();
+  });
+
+  const exitCode = await new Promise<number | null>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+      reject(new Error(`Electron smoke timed out. Output:\n${output}`));
+    }, 20_000);
+
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on('exit', (code) => {
+      clearTimeout(timeout);
+      resolve(code);
+    });
+  });
+
+  return { exitCode, output };
+}
