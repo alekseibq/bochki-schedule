@@ -1,7 +1,7 @@
 interface:
-  display_name: "Incident Retro"
-  short_description: "Record incidents and reusable retros"
-  default_prompt: "Use $incident-retro to record this case as an incident and extract reusable retrospectives."
+  display_name: 'Incident Retro'
+  short_description: 'Record incidents and reusable retros'
+  default_prompt: 'Use $incident-retro to record this case as an incident and extract reusable retrospectives.'
 
 policy:
   allow_implicit_invocation: true

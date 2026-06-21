@@ -8,6 +8,7 @@ description: Use when a debugging, access, CI, tooling, or delivery case should 
 Use this skill when the work produced a debugging or process lesson worth keeping in the repository.
 
 Create an `incident` when the value is in preserving the facts of one concrete case:
+
 - observed symptom
 - context
 - timeline of investigation
@@ -15,6 +16,7 @@ Create an `incident` when the value is in preserving the facts of one concrete c
 - misleading signals
 
 Create a `retro` when the value is in preserving a reusable lesson:
+
 - how to recognize the pattern
 - why the investigation was slow or wrong
 - what sequence to use next time
@@ -46,6 +48,7 @@ Create both when one concrete case produced a lesson that should be reused later
 ## Required structure
 
 For incidents, use these sections:
+
 - `Когда применять`
 - `Симптом`
 - `Контекст`
@@ -55,6 +58,7 @@ For incidents, use these sections:
 - `Порожденные retro`
 
 For retros, use these sections:
+
 - `Когда применять`
 - `Симптом`
 - `Что произошло`
