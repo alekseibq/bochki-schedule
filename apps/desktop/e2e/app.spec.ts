@@ -25,7 +25,8 @@ test('opens dictionary sections from the top menu', async () => {
 async function runElectronSmoke(
   userDataDirectory: string
 ): Promise<{ exitCode: number | null; output: string }> {
-  const child = spawn(electronPath, ['--no-sandbox', desktopRoot], {
+  const child = spawn(electronPath, [desktopRoot, '--no-sandbox'], {
+    cwd: desktopRoot,
     env: {
       ...process.env,
       BOCHKI_DATA_DIR: userDataDirectory,
