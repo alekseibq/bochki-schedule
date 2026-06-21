@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JsonFileStorage } from '@bochki/storage';
+import { loadData } from './data.js';
 import { resolveDataFilePath } from './paths.js';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
@@ -39,7 +40,9 @@ async function createMainWindow(): Promise<void> {
   }
 }
 
-ipcMain.handle('data:load', async () => createStorage().ensureDocument());
+ipcMain.handle('data:load', async () =>
+  loadData(createStorage(), getDataFilePath())
+);
 
 await app.whenReady();
 await createMainWindow();

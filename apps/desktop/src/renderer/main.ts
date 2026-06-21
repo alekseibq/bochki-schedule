@@ -14,17 +14,26 @@ const Root = defineComponent({
   name: 'Root',
   setup() {
     const dataError = ref<string | null>(null);
+    const dataInfo = ref<string | null>(null);
 
     onMounted(async () => {
       try {
-        await window.bochki.data.load();
+        const result = await window.bochki.data.load();
+        dataInfo.value = result.createdFromEmpty
+          ? 'Файл данных не найден. Создан новый пустой файл данных.'
+          : null;
       } catch {
+        dataInfo.value = null;
         dataError.value =
           'Файл данных поврежден или недоступен. Приложение не будет перезаписывать его автоматически.';
       }
     });
 
-    return () => h(AppShell, { dataError: dataError.value });
+    return () =>
+      h(AppShell, {
+        dataError: dataError.value,
+        dataInfo: dataInfo.value
+      });
   }
 });
 

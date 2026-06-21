@@ -1,15 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ScheduleDocument } from '@bochki/domain';
+import type { LoadDataResult } from '../shared/data.js';
 
 export interface BochkiDesktopApi {
   data: {
-    load: () => Promise<ScheduleDocument>;
+    load: () => Promise<LoadDataResult>;
   };
 }
 
 const api: BochkiDesktopApi = {
   data: {
-    load: () => ipcRenderer.invoke('data:load') as Promise<ScheduleDocument>
+    load: () => ipcRenderer.invoke('data:load') as Promise<LoadDataResult>
   }
 };
 

@@ -7,7 +7,7 @@
     "noEmit": true,
     "types": ["vite/client"]
   },
-  "include": ["src/renderer/**/*.ts", "vite.config.ts"],
+  "include": ["src/renderer/**/*.ts", "src/shared/**/*.ts", "vite.config.ts"],
   "references": [
     { "path": "../../packages/domain" },
     { "path": "../../packages/storage" },

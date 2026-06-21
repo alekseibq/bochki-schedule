@@ -12,9 +12,12 @@ test('opens dictionary sections from the top menu', async ({ page }) => {
       value: {
         data: {
           load: async () => ({
-            schemaVersion: 1,
-            participants: [],
-            trainers: []
+            createdFromEmpty: false,
+            document: {
+              schemaVersion: 1,
+              participants: [],
+              trainers: []
+            }
           })
         }
       }

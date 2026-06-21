@@ -1,15 +1,21 @@
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const rootCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const isWindows = process.platform === 'win32';
+const rootCommand = 'pnpm';
 const childProcesses = [];
 
 function run(command, args, options = {}) {
-  const child = spawn(command, args, {
-    stdio: 'inherit',
-    shell: false,
-    ...options
-  });
+  const child = isWindows
+    ? spawn('cmd.exe', ['/d', '/s', '/c', command, ...args], {
+        stdio: 'inherit',
+        ...options
+      })
+    : spawn(command, args, {
+        stdio: 'inherit',
+        shell: false,
+        ...options
+      });
   childProcesses.push(child);
   return child;
 }
