@@ -7,6 +7,7 @@
   "scripts": {
     "build": "pnpm --filter @bochki/domain build && pnpm --filter @bochki/storage build && pnpm --filter @bochki/ui build && pnpm --filter @bochki/desktop build",
     "dev": "pnpm --filter @bochki/desktop dev",
+    "qa:desktop": "pnpm --filter @bochki/desktop dev:qa",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
