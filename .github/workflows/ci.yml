@@ -10,7 +10,7 @@ on:
 
 jobs:
   checks:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -31,6 +31,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Install Linux E2E dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Commitlint
         if: github.event_name == 'pull_request'
         run: pnpm exec commitlint --from "${{ github.event.pull_request.base.sha }}" --to "${{ github.sha }}"
@@ -48,7 +51,31 @@ jobs:
         run: pnpm test:unit
 
       - name: E2E smoke
-        run: pnpm test:e2e
+        run: xvfb-run -a pnpm test:e2e
+
+      - name: Build
+        run: pnpm build
+
+  package-mac:
+    runs-on: macos-latest
+    needs: checks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm build

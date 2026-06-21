@@ -10,8 +10,8 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = resolve(currentDirectory, '..');
 
 test.skip(
-  process.platform !== 'darwin',
-  'Electron smoke runs on macOS CI for this macOS app.'
+  process.platform !== 'darwin' && process.env.CI !== 'true',
+  'Electron smoke runs on macOS locally or under Linux CI with xvfb.'
 );
 
 test('opens dictionary sections from the top menu', async () => {
