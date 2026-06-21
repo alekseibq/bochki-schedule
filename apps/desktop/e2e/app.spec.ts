@@ -26,7 +26,8 @@ test('opens dictionary sections from the top menu', async () => {
       args: [desktopRoot],
       env: {
         ...process.env,
-        BOCHKI_DATA_DIR: userDataDirectory
+        BOCHKI_DATA_DIR: userDataDirectory,
+        BOCHKI_E2E: '1'
       }
     });
 
