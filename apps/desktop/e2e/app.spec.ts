@@ -1,64 +1,34 @@
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { spawn } from 'node:child_process';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import electronPath from 'electron';
 import { expect, test } from '@playwright/test';
 
-const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const desktopRoot = resolve(currentDirectory, '..');
-const mainEntry = resolve(desktopRoot, 'dist/electron/main/index.js');
-
 test.skip(
-  process.platform !== 'darwin' && process.env.CI !== 'true',
-  'Electron smoke runs on macOS locally or under Linux CI with xvfb.'
+  process.platform === 'linux' && process.env.CI !== 'true',
+  'Renderer E2E runs in Linux CI where Playwright browsers are installed.'
 );
 
-test('opens dictionary sections from the top menu', async () => {
-  const userDataDirectory = await mkdtemp(join(tmpdir(), 'bochki-e2e-'));
-  const result = await runElectronSmoke(userDataDirectory);
+test('opens dictionary sections from the top menu', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'bochki', {
+      configurable: true,
+      value: {
+        data: {
+          load: async () => ({
+            schemaVersion: 1,
+            participants: [],
+            trainers: []
+          })
+        }
+      }
+    });
+  });
 
-  expect(result.output).toContain('[e2e] renderer self-test passed');
-  expect(result.exitCode).toBe(0);
+  await page.goto('/');
+  await expect(page.getByTestId('home-page')).toBeVisible();
+
+  await page.getByRole('menuitem', { name: 'Справочники' }).hover();
+  await page.getByRole('menuitem', { name: 'Участники' }).click();
+  await expect(page.getByTestId('participants-page')).toBeVisible();
+
+  await page.getByRole('menuitem', { name: 'Справочники' }).hover();
+  await page.getByRole('menuitem', { name: 'Сопровождающие' }).click();
+  await expect(page.getByTestId('trainers-page')).toBeVisible();
 });
-
-async function runElectronSmoke(
-  userDataDirectory: string
-): Promise<{ exitCode: number | null; output: string }> {
-  const child = spawn(electronPath, ['--no-sandbox', mainEntry], {
-    cwd: desktopRoot,
-    env: {
-      ...process.env,
-      BOCHKI_DATA_DIR: userDataDirectory,
-      BOCHKI_E2E_SELF_TEST: '1'
-    },
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-
-  let output = '';
-  child.stdout.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
-  });
-  child.stderr.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
-  });
-
-  const exitCode = await new Promise<number | null>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      child.kill('SIGTERM');
-      reject(new Error(`Electron smoke timed out. Output:\n${output}`));
-    }, 20_000);
-
-    child.on('error', (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-    child.on('exit', (code) => {
-      clearTimeout(timeout);
-      resolve(code);
-    });
-  });
-
-  return { exitCode, output };
-}

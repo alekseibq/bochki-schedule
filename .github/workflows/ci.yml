@@ -32,7 +32,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Linux E2E dependencies
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+        run: pnpm --filter @bochki/desktop exec playwright install --with-deps chromium
 
       - name: Commitlint
         if: github.event_name == 'pull_request'
@@ -51,7 +51,7 @@ jobs:
         run: pnpm test:unit
 
       - name: E2E smoke
-        run: xvfb-run -a pnpm test:e2e
+        run: pnpm test:e2e
 
       - name: Build
         run: pnpm build
