@@ -116,6 +116,24 @@ async function assertDmgExists(expectedArch) {
   }
 }
 
+async function assertPackagedAppLaunches(executablePath) {
+  const env = {
+    ...process.env,
+    BOCHKI_SMOKE_TEST: '1'
+  };
+
+  try {
+    await execFileAsync(executablePath, [], {
+      env,
+      timeout: 30_000
+    });
+  } catch (error) {
+    throw new Error(
+      `Packaged app failed to launch in smoke mode: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 const expectedArch = getExpectedArch();
 
 if (!expectedArch) {
@@ -136,3 +154,4 @@ const executablePath = await resolveExecutable(apps[0]);
 await assertExecutableArch(executablePath, expectedArch);
 await assertPackagedPayload(apps[0]);
 await assertDmgExists(expectedArch);
+await assertPackagedAppLaunches(executablePath);

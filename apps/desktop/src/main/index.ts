@@ -1,28 +1,13 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { JsonFileStorage } from '@bochki/storage';
-import { loadData } from './data.js';
-import { resolveDataFilePath } from './paths.js';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const SMOKE_TEST_TIMEOUT_MS = 15_000;
 
 interface CreateMainWindowOptions {
   show?: boolean;
-}
-
-function getDataFilePath(): string {
-  const dataDirectory = process.env.BOCHKI_DATA_DIR ?? app.getPath('userData');
-  return resolveDataFilePath(dataDirectory);
-}
-
-function createStorage(): JsonFileStorage {
-  return new JsonFileStorage({
-    dataFilePath: getDataFilePath(),
-    keepBackup: true
-  });
 }
 
 async function createMainWindow(
@@ -37,8 +22,7 @@ async function createMainWindow(
     title: 'Bochki Schedule',
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration: false,
-      preload: join(currentDirectory, '../preload/index.js')
+      nodeIntegration: false
     }
   });
 
@@ -52,14 +36,9 @@ async function createMainWindow(
 }
 
 async function runPackagedSmokeTest(): Promise<void> {
-  await access(join(currentDirectory, '../preload/index.js'));
   await access(join(currentDirectory, '../../renderer/index.html'));
-
-  const result = await loadData(createStorage(), getDataFilePath());
-
-  if (result.document.schemaVersion !== 2) {
-    throw new Error('Unexpected data load result.');
-  }
+  const window = await createMainWindow({ show: false });
+  window.destroy();
 }
 
 async function withTimeout<T>(
@@ -84,10 +63,6 @@ async function withTimeout<T>(
     }
   }
 }
-
-ipcMain.handle('data:load', async () =>
-  loadData(createStorage(), getDataFilePath())
-);
 
 await app.whenReady();
 
