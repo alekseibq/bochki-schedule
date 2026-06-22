@@ -2,8 +2,6 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -13,7 +11,19 @@ permissions:
 
 jobs:
   package-mac:
-    runs-on: macos-latest
+    name: Package macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-15-intel
+            package_script: package:mac:x64
+          - arch: arm64
+            runner: macos-latest
+            package_script: package:mac:arm64
 
     steps:
       - name: Checkout
@@ -32,26 +42,83 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve release metadata
+        id: release
+        shell: bash
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+
+            if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Unsupported release tag: ${GITHUB_REF_NAME}" >&2
+              exit 1
+            fi
+
+            FILE_VERSION="${VERSION}"
+          else
+            VERSION="0.0.0-dev"
+            SAFE_REF="$(echo "${GITHUB_REF_NAME}" | tr -c '[:alnum:]._-' '-')"
+            FILE_VERSION="${SAFE_REF}-${SHORT_SHA}"
+          fi
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "file_version=${FILE_VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set desktop package version
+        run: |
+          node -e "const fs = require('node:fs'); const path = 'apps/desktop/package.json'; const pkg = JSON.parse(fs.readFileSync(path, 'utf8')); pkg.version = process.argv[1]; fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');" "${{ steps.release.outputs.version }}"
+
       - name: Build
         run: pnpm build
 
       - name: Package macOS
-        run: pnpm package:mac
+        run: pnpm --filter @bochki/desktop run ${{ matrix.package_script }}
+
+      - name: Smoke packaged app
+        run: pnpm --filter @bochki/desktop run smoke:packaged -- --arch ${{ matrix.arch }}
+
+      - name: Rename DMG
+        id: dmg
+        shell: bash
+        run: |
+          OUTPUT_DIR="apps/desktop/release"
+          SOURCE="$(find "${OUTPUT_DIR}" -maxdepth 1 -type f -name 'Bochki-Schedule-*-mac-${{ matrix.arch }}.dmg' -print -quit)"
+
+          if [[ -z "${SOURCE}" ]]; then
+            echo "No DMG found for ${{ matrix.arch }} in ${OUTPUT_DIR}" >&2
+            find "${OUTPUT_DIR}" -maxdepth 2 -type f >&2
+            exit 1
+          fi
+
+          TARGET="${OUTPUT_DIR}/Bochki-Schedule-${{ steps.release.outputs.file_version }}-mac-${{ matrix.arch }}.dmg"
+          mv "${SOURCE}" "${TARGET}"
+          echo "path=${TARGET}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macos-package-${{ github.ref_name }}-${{ github.sha }}
-          path: |
-            apps/desktop/release/*.dmg
-            apps/desktop/release/*.zip
+          name: macos-dmg-${{ matrix.arch }}-${{ steps.release.outputs.file_version }}
+          path: ${{ steps.dmg.outputs.path }}
           if-no-files-found: error
 
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: package-mac
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-dmg-*
+          path: release-assets
+          merge-multiple: true
+
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            apps/desktop/release/*.dmg
-            apps/desktop/release/*.zip
+          files: release-assets/*.dmg
           generate_release_notes: true

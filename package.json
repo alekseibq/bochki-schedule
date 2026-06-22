@@ -1,6 +1,6 @@
 {
   "name": "bochki-schedule",
-  "version": "0.0.0",
+  "version": "0.0.0-dev",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.12.1",
@@ -15,7 +15,9 @@
     "test:e2e": "pnpm --filter @bochki/desktop test:e2e",
     "test:unit": "pnpm -r test:unit",
     "typecheck": "pnpm --filter @bochki/domain build && pnpm --filter @bochki/storage build && pnpm --filter @bochki/ui build && pnpm -r typecheck",
-    "package:mac": "pnpm --filter @bochki/desktop package:mac"
+    "package:mac": "pnpm --filter @bochki/desktop package:mac",
+    "package:mac:arm64": "pnpm --filter @bochki/desktop package:mac:arm64",
+    "package:mac:x64": "pnpm --filter @bochki/desktop package:mac:x64"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
