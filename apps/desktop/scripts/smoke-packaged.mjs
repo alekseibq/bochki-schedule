@@ -1,4 +1,5 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { constants as fsConstants } from 'node:fs';
 import { access, mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
@@ -135,11 +136,20 @@ function resolveDiagnosticsPaths(expectedArch, startupVariant) {
   );
 
   return {
+    appleEventsLogPath: join(diagnosticsDirectory, 'log-appleevents.txt'),
+    childStatePath: join(diagnosticsDirectory, 'child-state.json'),
     diagnosticsDirectory,
     launchErrorPath: join(diagnosticsDirectory, 'launch-error.txt'),
+    launchServicesLogPath: join(diagnosticsDirectory, 'log-launchservices.txt'),
+    launchctlPath: join(diagnosticsDirectory, 'launchctl-print.txt'),
+    lsappinfoInfoPath: join(diagnosticsDirectory, 'lsappinfo-info.txt'),
+    lsappinfoListPath: join(diagnosticsDirectory, 'lsappinfo-list.txt'),
     metadataPath: join(diagnosticsDirectory, 'startup-metadata.json'),
+    processListPath: join(diagnosticsDirectory, 'ps.txt'),
+    samplePath: join(diagnosticsDirectory, 'sample.txt'),
     screenshotMissingPath: join(diagnosticsDirectory, 'screenshot-missing.txt'),
     screenshotPath: join(diagnosticsDirectory, 'startup-screenshot.png'),
+    spindumpPath: join(diagnosticsDirectory, 'spindump.txt'),
     startupLogPath: join(diagnosticsDirectory, 'startup-log.txt'),
     stderrPath: join(diagnosticsDirectory, 'stderr.txt'),
     stdoutPath: join(diagnosticsDirectory, 'stdout.txt')
@@ -168,18 +178,53 @@ async function assertPackagedAppLaunches(
     BOCHKI_STARTUP_VARIANT: startupVariant
   };
 
+  const child = spawn(executablePath, [], {
+    env,
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  let stdout = '';
+  let stderr = '';
+  let timeoutTriggered = false;
+
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk.toString();
+  });
+
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk.toString();
+  });
+
   try {
-    const result = await execFileAsync(executablePath, [], {
-      env,
-      timeout: 30_000
+    const exit = await waitForChild(child, diagnostics, 30_000, () => {
+      timeoutTriggered = true;
+      return captureSystemDiagnostics(child.pid, diagnostics);
     });
 
-    await writeDiagnosticFile(diagnostics.stdoutPath, result.stdout ?? '');
-    await writeDiagnosticFile(diagnostics.stderrPath, result.stderr ?? '');
+    await writeDiagnosticFile(diagnostics.stdoutPath, stdout);
+    await writeDiagnosticFile(diagnostics.stderrPath, stderr);
+
+    if (exit.code !== 0 || exit.signal) {
+      const details = [];
+
+      if (exit.code !== null) {
+        details.push(`code=${String(exit.code)}`);
+      }
+
+      if (exit.signal) {
+        details.push(`signal=${String(exit.signal)}`);
+      }
+
+      if (stderr) {
+        details.push(`stderr=${stderr.trim()}`);
+      }
+
+      throw new Error(
+        `Packaged app failed to launch in smoke mode: exited unexpectedly${details.length > 0 ? ` (${details.join('; ')})` : ''}`
+      );
+    }
   } catch (error) {
     const details = [];
-    let stdout = '';
-    let stderr = '';
 
     if (error && typeof error === 'object') {
       if ('code' in error && error.code) {
@@ -220,6 +265,10 @@ async function assertPackagedAppLaunches(
       `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
     );
 
+    if (timeoutTriggered) {
+      details.push('timeout=true');
+    }
+
     throw new Error(
       `Packaged app failed to launch in smoke mode: ${error instanceof Error ? error.message : String(error)}${details.length > 0 ? ` (${details.join('; ')})` : ''}`
     );
@@ -233,6 +282,174 @@ async function assertPackagedAppLaunches(
       );
     }
   }
+}
+
+async function waitForChild(child, diagnostics, timeoutMs, onTimeout) {
+  let timeout;
+
+  try {
+    return await Promise.race([
+      once(child, 'exit').then(([code, signal]) => ({ code, signal })),
+      once(child, 'error').then(([error]) => {
+        throw error;
+      }),
+      new Promise((resolve, reject) => {
+        timeout = setTimeout(async () => {
+          try {
+            await onTimeout();
+            await terminateChild(child);
+            reject(new Error(`Timed out after ${timeoutMs}ms.`));
+          } catch (error) {
+            reject(error);
+          }
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeout) {
+      globalThis.clearTimeout(timeout);
+    }
+
+    await writeDiagnosticFile(
+      diagnostics.childStatePath,
+      `${JSON.stringify(
+        {
+          killed: child.killed,
+          pid: child.pid,
+          spawnfile: child.spawnfile,
+          spawnargs: child.spawnargs
+        },
+        null,
+        2
+      )}\n`
+    );
+  }
+}
+
+async function terminateChild(child) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+
+  child.kill('SIGTERM');
+
+  try {
+    await Promise.race([
+      once(child, 'exit'),
+      new Promise((resolve) => setTimeout(resolve, 5_000))
+    ]);
+  } catch {
+    // Ignore and escalate to SIGKILL below.
+  }
+
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGKILL');
+  }
+}
+
+async function captureSystemDiagnostics(pid, diagnostics) {
+  if (!pid || process.platform !== 'darwin') {
+    return;
+  }
+
+  const uid =
+    typeof process.getuid === 'function' ? String(process.getuid()) : '';
+
+  await Promise.all([
+    runDiagnosticCommand(
+      'ps',
+      ['-p', String(pid), '-o', 'pid,ppid,stat,time,command'],
+      diagnostics.processListPath
+    ),
+    runDiagnosticCommand(
+      'lsappinfo',
+      ['info', '-only', 'pid', String(pid)],
+      diagnostics.lsappinfoInfoPath
+    ),
+    runDiagnosticCommand('lsappinfo', ['list'], diagnostics.lsappinfoListPath),
+    runDiagnosticCommand(
+      'sample',
+      [String(pid), '3', '-mayDie'],
+      diagnostics.samplePath,
+      { timeoutMs: 10_000 }
+    ),
+    runDiagnosticCommand(
+      'spindump',
+      [String(pid), '5', '5'],
+      diagnostics.spindumpPath,
+      { timeoutMs: 20_000 }
+    ),
+    runDiagnosticCommand(
+      'launchctl',
+      uid
+        ? ['print', `gui/${uid}/com.apple.coreservices.launchservicesd`]
+        : ['print', 'system/com.apple.coreservices.launchservicesd'],
+      diagnostics.launchctlPath,
+      { timeoutMs: 10_000 }
+    ),
+    runDiagnosticCommand(
+      'log',
+      [
+        'show',
+        '--last',
+        '5m',
+        '--style',
+        'compact',
+        '--predicate',
+        'subsystem == "com.apple.launchservices"'
+      ],
+      diagnostics.launchServicesLogPath,
+      { timeoutMs: 15_000 }
+    ),
+    runDiagnosticCommand(
+      'log',
+      [
+        'show',
+        '--last',
+        '5m',
+        '--style',
+        'compact',
+        '--predicate',
+        'subsystem == "com.apple.appleevents"'
+      ],
+      diagnostics.appleEventsLogPath,
+      { timeoutMs: 15_000 }
+    )
+  ]);
+}
+
+async function runDiagnosticCommand(command, args, outputPath, options = {}) {
+  try {
+    const result = await execFileAsync(command, args, {
+      timeout: options.timeoutMs ?? 10_000
+    });
+    await writeDiagnosticFile(
+      outputPath,
+      `${formatCommand(command, args)}\n${result.stdout}${result.stderr}`
+    );
+  } catch (error) {
+    await writeDiagnosticFile(
+      outputPath,
+      `${formatCommand(command, args)}\n${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n${readExecOutput(error)}`
+    );
+  }
+}
+
+function formatCommand(command, args) {
+  return `$ ${command} ${args.join(' ')}\n`;
+}
+
+function readExecOutput(error) {
+  if (!error || typeof error !== 'object') {
+    return '';
+  }
+
+  const stdout =
+    'stdout' in error && typeof error.stdout === 'string' ? error.stdout : '';
+  const stderr =
+    'stderr' in error && typeof error.stderr === 'string' ? error.stderr : '';
+
+  return `${stdout}${stderr}`;
 }
 
 const expectedArch = getExpectedArch();
