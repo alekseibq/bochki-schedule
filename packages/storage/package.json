@@ -1,6 +1,6 @@
 {
   "name": "@bochki/storage",
-  "version": "0.0.0",
+  "version": "0.0.0-dev",
   "private": true,
   "type": "module",
   "exports": {

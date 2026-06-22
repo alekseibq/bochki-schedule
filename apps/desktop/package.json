@@ -1,6 +1,6 @@
 {
   "name": "@bochki/desktop",
-  "version": "0.0.0",
+  "version": "0.0.0-dev",
   "private": true,
   "type": "module",
   "main": "dist/electron/main/index.js",
@@ -10,7 +10,10 @@
     "build:renderer": "vite build",
     "dev": "node scripts/dev.mjs",
     "dev:qa": "node scripts/dev-qa.mjs",
-    "package:mac": "electron-builder --mac --publish never",
+    "package:mac": "electron-builder --mac dmg --publish never",
+    "package:mac:arm64": "electron-builder --mac dmg --arm64 --publish never",
+    "package:mac:x64": "electron-builder --mac dmg --x64 --publish never",
+    "smoke:packaged": "node scripts/smoke-packaged.mjs",
     "test:e2e": "pnpm build && playwright test",
     "test:unit": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit"
@@ -37,7 +40,8 @@
   },
   "build": {
     "appId": "ru.bochki.schedule",
-    "productName": "Расписание Бочки",
+    "productName": "Bochki Schedule",
+    "artifactName": "Bochki-Schedule-${version}-mac-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -46,10 +50,7 @@
       "package.json"
     ],
     "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ]
+      "target": "dmg"
     }
   }
 }

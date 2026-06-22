@@ -21,7 +21,7 @@ export const HomePage = defineComponent({
           h(
             'h1',
             { class: 'text-2xl font-semibold text-slate-950' },
-            'Расписание Бочки'
+            'Bochki Schedule'
           ),
           h(
             'p',
