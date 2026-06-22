@@ -28,14 +28,10 @@ function getStartupVariant() {
   const variantIndex = process.argv.indexOf('--variant');
 
   if (variantIndex === -1) {
-    return process.env.BOCHKI_STARTUP_VARIANT ?? 'baseline';
+    return process.env.BOCHKI_STARTUP_VARIANT ?? 'ultra-minimal';
   }
 
   return process.argv[variantIndex + 1];
-}
-
-function shouldIgnorePersistenceState(startupVariant) {
-  return startupVariant.endsWith('-ignore-persistence-state');
 }
 
 async function findApps(directory, depth = 0) {
@@ -171,10 +167,6 @@ async function assertPackagedAppLaunches(
     BOCHKI_STARTUP_SCREENSHOT_PATH: diagnostics.screenshotPath,
     BOCHKI_STARTUP_VARIANT: startupVariant
   };
-
-  if (shouldIgnorePersistenceState(startupVariant)) {
-    env.ApplePersistenceIgnoreState = 'YES';
-  }
 
   try {
     const result = await execFileAsync(executablePath, [], {

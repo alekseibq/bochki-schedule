@@ -21,35 +21,11 @@ jobs:
           - arch: x64
             runner: macos-15-intel
             package_script: package:mac:x64
-            variant: baseline
-          - arch: x64
-            runner: macos-15-intel
-            package_script: package:mac:x64
-            variant: no-browser-window
-          - arch: x64
-            runner: macos-15-intel
-            package_script: package:mac:x64
-            variant: baseline-ignore-persistence-state
-          - arch: x64
-            runner: macos-15-intel
-            package_script: package:mac:x64
-            variant: no-browser-window-ignore-persistence-state
+            variant: ultra-minimal
           - arch: arm64
             runner: macos-latest
             package_script: package:mac:arm64
-            variant: baseline
-          - arch: arm64
-            runner: macos-latest
-            package_script: package:mac:arm64
-            variant: no-browser-window
-          - arch: arm64
-            runner: macos-latest
-            package_script: package:mac:arm64
-            variant: baseline-ignore-persistence-state
-          - arch: arm64
-            runner: macos-latest
-            package_script: package:mac:arm64
-            variant: no-browser-window-ignore-persistence-state
+            variant: ultra-minimal
 
     steps:
       - name: Checkout
