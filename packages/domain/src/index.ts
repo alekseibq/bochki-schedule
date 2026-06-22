@@ -142,10 +142,16 @@ export const ScheduleDocumentSchema = ScheduleDocumentShapeSchema.superRefine(
 
     assertUniqueIds(participants, ['dictionaries', 'participants'], context);
     assertUniqueIds(trainers, ['dictionaries', 'trainers'], context);
-    assertUniqueIds(procedureTypes, ['dictionaries', 'procedureTypes'], context);
+    assertUniqueIds(
+      procedureTypes,
+      ['dictionaries', 'procedureTypes'],
+      context
+    );
     assertUniqueIds(seminars, ['seminars'], context);
 
-    const participantIds = new Set(participants.map((participant) => participant.id));
+    const participantIds = new Set(
+      participants.map((participant) => participant.id)
+    );
     const trainerIds = new Set(trainers.map((trainer) => trainer.id));
     const procedureTypeIds = new Set(
       procedureTypes.map((procedureType) => procedureType.id)
@@ -162,7 +168,14 @@ export const ScheduleDocumentSchema = ScheduleDocumentShapeSchema.superRefine(
         assertProcedureTypeReference(
           procedureTypeIds,
           limit.procedureTypeId,
-          ['seminars', seminarIndex, 'generalDayParams', 'procedureLimits', limitIndex, 'procedureTypeId'],
+          [
+            'seminars',
+            seminarIndex,
+            'generalDayParams',
+            'procedureLimits',
+            limitIndex,
+            'procedureTypeId'
+          ],
           context
         );
       });
@@ -190,14 +203,26 @@ export const ScheduleDocumentSchema = ScheduleDocumentShapeSchema.superRefine(
         assertProcedureTypeReference(
           procedureTypeIds,
           session.procedureTypeId,
-          ['seminars', seminarIndex, 'procedureSessions', sessionIndex, 'procedureTypeId'],
+          [
+            'seminars',
+            seminarIndex,
+            'procedureSessions',
+            sessionIndex,
+            'procedureTypeId'
+          ],
           context
         );
 
         if (session.seminarDay > seminar.daysCount) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ['seminars', seminarIndex, 'procedureSessions', sessionIndex, 'seminarDay'],
+            path: [
+              'seminars',
+              seminarIndex,
+              'procedureSessions',
+              sessionIndex,
+              'seminarDay'
+            ],
             message: 'seminarDay must be within seminar daysCount.'
           });
         }
@@ -207,7 +232,13 @@ export const ScheduleDocumentSchema = ScheduleDocumentShapeSchema.superRefine(
             assertReference(
               participantIds,
               session.participantId,
-              ['seminars', seminarIndex, 'procedureSessions', sessionIndex, 'participantId'],
+              [
+                'seminars',
+                seminarIndex,
+                'procedureSessions',
+                sessionIndex,
+                'participantId'
+              ],
               'participant',
               context
             );
@@ -216,35 +247,49 @@ export const ScheduleDocumentSchema = ScheduleDocumentShapeSchema.superRefine(
             assertReference(
               participantIds,
               session.participantId,
-              ['seminars', seminarIndex, 'procedureSessions', sessionIndex, 'participantId'],
+              [
+                'seminars',
+                seminarIndex,
+                'procedureSessions',
+                sessionIndex,
+                'participantId'
+              ],
               'participant',
               context
             );
             assertReference(
               trainerIds,
               session.trainerId,
-              ['seminars', seminarIndex, 'procedureSessions', sessionIndex, 'trainerId'],
+              [
+                'seminars',
+                seminarIndex,
+                'procedureSessions',
+                sessionIndex,
+                'trainerId'
+              ],
               'trainer',
               context
             );
             break;
           case 'group':
-            session.participantIds.forEach((participantId, participantIndex) => {
-              assertReference(
-                participantIds,
-                participantId,
-                [
-                  'seminars',
-                  seminarIndex,
-                  'procedureSessions',
-                  sessionIndex,
-                  'participantIds',
-                  participantIndex
-                ],
-                'participant',
-                context
-              );
-            });
+            session.participantIds.forEach(
+              (participantId, participantIndex) => {
+                assertReference(
+                  participantIds,
+                  participantId,
+                  [
+                    'seminars',
+                    seminarIndex,
+                    'procedureSessions',
+                    sessionIndex,
+                    'participantIds',
+                    participantIndex
+                  ],
+                  'participant',
+                  context
+                );
+              }
+            );
             session.trainerIds.forEach((trainerId, trainerIndex) => {
               assertReference(
                 trainerIds,
