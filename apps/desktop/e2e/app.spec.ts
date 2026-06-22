@@ -14,9 +14,13 @@ test('opens dictionary sections from the top menu', async ({ page }) => {
           load: async () => ({
             createdFromEmpty: false,
             document: {
-              schemaVersion: 1,
-              participants: [],
-              trainers: []
+              schemaVersion: 2,
+              dictionaries: {
+                participants: [],
+                trainers: [],
+                procedureTypes: []
+              },
+              seminars: []
             }
           })
         }

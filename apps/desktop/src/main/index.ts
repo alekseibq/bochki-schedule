@@ -57,7 +57,7 @@ async function runPackagedSmokeTest(): Promise<void> {
 
   const result = await loadData(createStorage(), getDataFilePath());
 
-  if (result.document.schemaVersion !== 1) {
+  if (result.document.schemaVersion !== 2) {
     throw new Error('Unexpected data load result.');
   }
 }

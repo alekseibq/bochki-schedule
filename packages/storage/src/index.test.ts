@@ -22,18 +22,24 @@ describe('JsonFileStorage', () => {
       createEmptyScheduleDocument()
     );
     await expect(readFile(dataFilePath, 'utf8')).resolves.toContain(
-      '"schemaVersion": 1'
+      '"schemaVersion": 2'
     );
   });
 
   it('loads a valid saved document', async () => {
     const dataFilePath = await createTempDataPath();
     const document: ScheduleDocument = {
-      schemaVersion: 1,
-      participants: [
-        { id: '4bc3d955-726e-4632-b43e-c72f5a0f060a', name: 'Анна' }
-      ],
-      trainers: [{ id: 'cfa1b5ba-820d-4dd1-a790-467c40f72f2a', name: 'Олег' }]
+      schemaVersion: 2,
+      dictionaries: {
+        participants: [
+          { id: '4bc3d955-726e-4632-b43e-c72f5a0f060a', name: 'Анна' }
+        ],
+        trainers: [
+          { id: 'cfa1b5ba-820d-4dd1-a790-467c40f72f2a', name: 'Олег' }
+        ],
+        procedureTypes: []
+      },
+      seminars: []
     };
     const storage = new JsonFileStorage({ dataFilePath });
 
@@ -47,11 +53,15 @@ describe('JsonFileStorage', () => {
     const storage = new JsonFileStorage({ dataFilePath });
     const first = createEmptyScheduleDocument();
     const second: ScheduleDocument = {
-      schemaVersion: 1,
-      participants: [
-        { id: '4bc3d955-726e-4632-b43e-c72f5a0f060a', name: 'Анна' }
-      ],
-      trainers: []
+      schemaVersion: 2,
+      dictionaries: {
+        participants: [
+          { id: '4bc3d955-726e-4632-b43e-c72f5a0f060a', name: 'Анна' }
+        ],
+        trainers: [],
+        procedureTypes: []
+      },
+      seminars: []
     };
 
     await storage.saveDocument(first);
