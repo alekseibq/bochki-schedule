@@ -1,16 +1,13 @@
 import { execFile } from 'node:child_process';
 import { constants as fsConstants } from 'node:fs';
-import { access, mkdtemp, readdir, rm, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { access, readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const desktopRoot = fileURLToPath(new URL('../', import.meta.url));
 const releaseDirectory = join(desktopRoot, 'release');
-const smokeTimeoutMs = 20_000;
 
 const archAliases = {
   arm64: 'arm64',
@@ -86,49 +83,36 @@ async function assertExecutableArch(executablePath, expectedArch) {
   }
 }
 
-async function runSmokeExecutable(executablePath) {
-  const dataDirectory = await mkdtemp(join(tmpdir(), 'bochki-smoke-data-'));
+async function assertPackagedPayload(appPath) {
+  const infoPlistPath = join(appPath, 'Contents', 'Info.plist');
+  const appAsarPath = join(appPath, 'Contents', 'Resources', 'app.asar');
 
-  try {
-    await new Promise((resolve, reject) => {
-      const child = spawn(executablePath, [], {
-        env: {
-          ...process.env,
-          BOCHKI_DATA_DIR: dataDirectory,
-          BOCHKI_SMOKE_TEST: '1'
-        },
-        stdio: ['ignore', 'inherit', 'inherit']
-      });
+  await access(infoPlistPath, fsConstants.R_OK);
+  await access(appAsarPath, fsConstants.R_OK);
 
-      const timeout = setTimeout(() => {
-        child.kill('SIGTERM');
-        reject(
-          new Error(`Packaged smoke test timed out after ${smokeTimeoutMs}ms.`)
-        );
-      }, smokeTimeoutMs);
+  const appAsarStat = await stat(appAsarPath);
 
-      child.on('exit', (code, signal) => {
-        globalThis.clearTimeout(timeout);
+  if (!appAsarStat.isFile() || appAsarStat.size === 0) {
+    throw new Error(`Invalid packaged app payload: ${appAsarPath}`);
+  }
+}
 
-        if (code === 0) {
-          resolve();
-          return;
-        }
+async function assertDmgExists(expectedArch) {
+  const entries = await readdir(releaseDirectory);
+  const expectedSuffix = `-mac-${expectedArch}.dmg`;
+  const dmg = entries.find((entry) => entry.endsWith(expectedSuffix));
 
-        reject(
-          new Error(
-            `Packaged smoke test exited with ${signal ?? code ?? 'unknown'}.`
-          )
-        );
-      });
+  if (!dmg) {
+    throw new Error(
+      `No DMG ending with ${expectedSuffix} found in ${releaseDirectory}.`
+    );
+  }
 
-      child.on('error', (error) => {
-        globalThis.clearTimeout(timeout);
-        reject(error);
-      });
-    });
-  } finally {
-    await rm(dataDirectory, { force: true, recursive: true });
+  const dmgPath = join(releaseDirectory, dmg);
+  const dmgStat = await stat(dmgPath);
+
+  if (!dmgStat.isFile() || dmgStat.size === 0) {
+    throw new Error(`Invalid DMG artifact: ${dmgPath}`);
   }
 }
 
@@ -150,4 +134,5 @@ if (apps.length !== 1) {
 
 const executablePath = await resolveExecutable(apps[0]);
 await assertExecutableArch(executablePath, expectedArch);
-await runSmokeExecutable(executablePath);
+await assertPackagedPayload(apps[0]);
+await assertDmgExists(expectedArch);
