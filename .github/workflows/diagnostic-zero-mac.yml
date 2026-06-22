@@ -1,6 +1,9 @@
 name: Diagnostic Zero macOS
 
 on:
+  push:
+    branches:
+      - feat/zero-startup-diagnostic
   workflow_dispatch:
 
 permissions:
