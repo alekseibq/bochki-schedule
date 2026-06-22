@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { constants as fsConstants } from 'node:fs';
-import { access, readdir, stat } from 'node:fs/promises';
+import { access, mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -116,19 +116,54 @@ async function assertDmgExists(expectedArch) {
   }
 }
 
-async function assertPackagedAppLaunches(executablePath) {
+function resolveDiagnosticsPaths(expectedArch) {
+  const diagnosticsDirectory = join(
+    releaseDirectory,
+    'diagnostics',
+    expectedArch
+  );
+
+  return {
+    diagnosticsDirectory,
+    launchErrorPath: join(diagnosticsDirectory, 'launch-error.txt'),
+    metadataPath: join(diagnosticsDirectory, 'startup-metadata.json'),
+    screenshotMissingPath: join(diagnosticsDirectory, 'screenshot-missing.txt'),
+    screenshotPath: join(diagnosticsDirectory, 'startup-screenshot.png'),
+    startupLogPath: join(diagnosticsDirectory, 'startup-log.txt'),
+    stderrPath: join(diagnosticsDirectory, 'stderr.txt'),
+    stdoutPath: join(diagnosticsDirectory, 'stdout.txt')
+  };
+}
+
+async function writeDiagnosticFile(path, content) {
+  await writeFile(path, content, 'utf8');
+}
+
+async function assertPackagedAppLaunches(executablePath, expectedArch) {
+  const diagnostics = resolveDiagnosticsPaths(expectedArch);
+  await mkdir(diagnostics.diagnosticsDirectory, { recursive: true });
+
   const env = {
     ...process.env,
-    BOCHKI_SMOKE_TEST: '1'
+    BOCHKI_SMOKE_TEST: '1',
+    BOCHKI_STARTUP_DIAGNOSTIC: '1',
+    BOCHKI_STARTUP_LOG_PATH: diagnostics.startupLogPath,
+    BOCHKI_STARTUP_METADATA_PATH: diagnostics.metadataPath,
+    BOCHKI_STARTUP_SCREENSHOT_PATH: diagnostics.screenshotPath
   };
 
   try {
-    await execFileAsync(executablePath, [], {
+    const result = await execFileAsync(executablePath, [], {
       env,
       timeout: 30_000
     });
+
+    await writeDiagnosticFile(diagnostics.stdoutPath, result.stdout ?? '');
+    await writeDiagnosticFile(diagnostics.stderrPath, result.stderr ?? '');
   } catch (error) {
     const details = [];
+    let stdout = '';
+    let stderr = '';
 
     if (error && typeof error === 'object') {
       if ('code' in error && error.code) {
@@ -148,6 +183,7 @@ async function assertPackagedAppLaunches(executablePath) {
         typeof error.stdout === 'string' &&
         error.stdout
       ) {
+        stdout = error.stdout;
         details.push(`stdout=${error.stdout.trim()}`);
       }
 
@@ -156,13 +192,30 @@ async function assertPackagedAppLaunches(executablePath) {
         typeof error.stderr === 'string' &&
         error.stderr
       ) {
+        stderr = error.stderr;
         details.push(`stderr=${error.stderr.trim()}`);
       }
     }
 
+    await writeDiagnosticFile(diagnostics.stdoutPath, stdout);
+    await writeDiagnosticFile(diagnostics.stderrPath, stderr);
+    await writeDiagnosticFile(
+      diagnostics.launchErrorPath,
+      `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
+    );
+
     throw new Error(
       `Packaged app failed to launch in smoke mode: ${error instanceof Error ? error.message : String(error)}${details.length > 0 ? ` (${details.join('; ')})` : ''}`
     );
+  } finally {
+    try {
+      await access(diagnostics.screenshotPath, fsConstants.R_OK);
+    } catch {
+      await writeDiagnosticFile(
+        diagnostics.screenshotMissingPath,
+        'No screenshot was captured during startup diagnostics.\n'
+      );
+    }
   }
 }
 
@@ -186,4 +239,4 @@ const executablePath = await resolveExecutable(apps[0]);
 await assertExecutableArch(executablePath, expectedArch);
 await assertPackagedPayload(apps[0]);
 await assertDmgExists(expectedArch);
-await assertPackagedAppLaunches(executablePath);
+await assertPackagedAppLaunches(executablePath, expectedArch);
