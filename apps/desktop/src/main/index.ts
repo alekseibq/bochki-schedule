@@ -18,6 +18,7 @@ interface CreateMainWindowOptions {
 function applyStartupVariant(variant: string): void {
   switch (variant) {
     case 'baseline':
+    case 'baseline-ignore-persistence-state':
       return;
     case 'disable-hw-accel':
       app.disableHardwareAcceleration();
@@ -29,6 +30,7 @@ function applyStartupVariant(variant: string): void {
       app.commandLine.appendSwitch('disable-gpu-sandbox');
       return;
     case 'no-browser-window':
+    case 'no-browser-window-ignore-persistence-state':
       return;
     default:
       throw new Error(`Unsupported startup variant: ${variant}`);
@@ -110,6 +112,11 @@ async function createMainWindow(
 
 async function runPackagedSmokeTest(): Promise<void> {
   if (startupVariant === 'no-browser-window') {
+    await startupDiagnostics.mark('smoke:skip-browser-window');
+    return;
+  }
+
+  if (startupVariant === 'no-browser-window-ignore-persistence-state') {
     await startupDiagnostics.mark('smoke:skip-browser-window');
     return;
   }
