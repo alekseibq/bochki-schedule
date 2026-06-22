@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   package-mac:
-    name: Diagnostic macOS ${{ matrix.arch }}
+    name: Diagnostic macOS ${{ matrix.arch }} / ${{ matrix.variant }}
     runs-on: ${{ matrix.runner }}
 
     strategy:
@@ -21,9 +21,43 @@ jobs:
           - arch: x64
             runner: macos-15-intel
             package_script: package:mac:x64
+            variant: baseline
+          - arch: x64
+            runner: macos-15-intel
+            package_script: package:mac:x64
+            variant: disable-hw-accel
+          - arch: x64
+            runner: macos-15-intel
+            package_script: package:mac:x64
+            variant: disable-gpu
+          - arch: x64
+            runner: macos-15-intel
+            package_script: package:mac:x64
+            variant: disable-gpu-sandbox
+          - arch: x64
+            runner: macos-15-intel
+            package_script: package:mac:x64
+            variant: no-browser-window
           - arch: arm64
             runner: macos-latest
             package_script: package:mac:arm64
+            variant: baseline
+          - arch: arm64
+            runner: macos-latest
+            package_script: package:mac:arm64
+            variant: disable-hw-accel
+          - arch: arm64
+            runner: macos-latest
+            package_script: package:mac:arm64
+            variant: disable-gpu
+          - arch: arm64
+            runner: macos-latest
+            package_script: package:mac:arm64
+            variant: disable-gpu-sandbox
+          - arch: arm64
+            runner: macos-latest
+            package_script: package:mac:arm64
+            variant: no-browser-window
 
     steps:
       - name: Checkout
@@ -89,12 +123,12 @@ jobs:
           if-no-files-found: error
 
       - name: Smoke packaged app
-        run: pnpm --filter @bochki/desktop run smoke:packaged -- --arch ${{ matrix.arch }}
+        run: pnpm --filter @bochki/desktop run smoke:packaged -- --arch ${{ matrix.arch }} --variant ${{ matrix.variant }}
 
       - name: Upload startup diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: diagnostic-zero-startup-${{ matrix.arch }}-${{ steps.diagnostic.outputs.file_version }}
-          path: apps/desktop/release/diagnostics/${{ matrix.arch }}
+          name: diagnostic-zero-startup-${{ matrix.arch }}-${{ matrix.variant }}-${{ steps.diagnostic.outputs.file_version }}
+          path: apps/desktop/release/diagnostics/${{ matrix.arch }}/${{ matrix.variant }}
           if-no-files-found: warn

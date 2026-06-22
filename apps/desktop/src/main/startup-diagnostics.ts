@@ -1,7 +1,7 @@
 import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { BrowserWindow } from 'electron';
+import type { App, BrowserWindow } from 'electron';
 
 interface StartupDiagnosticsOptions {
   enabled: boolean;
@@ -17,12 +17,16 @@ interface StartupPhaseRecord {
 }
 
 interface StartupMetadata {
+  context: Record<string, string | number | boolean | null>;
   lastPhase: string | null;
   phases: StartupPhaseRecord[];
   screenshotPath: string;
 }
 
 export interface StartupDiagnostics {
+  recordContext: (
+    detail: Record<string, string | number | boolean | null>
+  ) => Promise<void>;
   captureWindow: (
     window: BrowserWindow | null,
     reason: string
@@ -33,13 +37,16 @@ export interface StartupDiagnostics {
     phase: string,
     detail?: Record<string, string | number | boolean | null>
   ) => Promise<void>;
+  registerApp: (app: App) => void;
   registerWindow: (window: BrowserWindow) => void;
   resolvePaths: () => StartupDiagnosticsOptions;
+  startHeartbeat: (intervalMs: number) => void;
 }
 
 export function createStartupDiagnostics(): StartupDiagnostics {
   const options = resolveOptions();
   const metadata: StartupMetadata = {
+    context: {},
     lastPhase: null,
     phases: [],
     screenshotPath: options.screenshotPath
@@ -49,12 +56,15 @@ export function createStartupDiagnostics(): StartupDiagnostics {
   installProcessHandlers(mark);
 
   return {
+    recordContext,
     captureWindow,
     flush,
     isEnabled: options.enabled,
     mark,
+    registerApp,
     registerWindow,
-    resolvePaths: () => options
+    resolvePaths: () => options,
+    startHeartbeat
   };
 
   async function mark(
@@ -160,6 +170,86 @@ export function createStartupDiagnostics(): StartupDiagnostics {
         });
       }
     );
+  }
+
+  function registerApp(app: App): void {
+    if (!options.enabled) {
+      return;
+    }
+
+    app.on('will-finish-launching', () => {
+      void mark('app:will-finish-launching');
+    });
+    app.on('ready', () => {
+      void mark('app:ready');
+    });
+    app.on('open-file', (_event, path) => {
+      void mark('app:open-file', { path });
+    });
+    app.on('open-url', (_event, url) => {
+      void mark('app:open-url', { url });
+    });
+    app.on('activate', () => {
+      void mark('app:activate');
+    });
+    app.on('gpu-info-update', () => {
+      void mark('app:gpu-info-update');
+    });
+    app.on('child-process-gone', (_event, details) => {
+      void mark('app:child-process-gone', {
+        exitCode: details.exitCode,
+        name: details.name ?? null,
+        reason: details.reason,
+        serviceName:
+          'serviceName' in details ? (details.serviceName ?? null) : null,
+        type: details.type ?? null
+      });
+    });
+    app.on('browser-window-created', () => {
+      void mark('app:browser-window-created');
+    });
+    app.on('window-all-closed', () => {
+      void mark('app:window-all-closed');
+    });
+  }
+
+  function startHeartbeat(intervalMs: number): void {
+    if (!options.enabled) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void mark('process:heartbeat', {
+        pid: process.pid,
+        uptimeSeconds: Math.round(process.uptime())
+      });
+    }, intervalMs);
+
+    interval.unref();
+  }
+
+  async function recordContext(
+    detail: Record<string, string | number | boolean | null>
+  ): Promise<void> {
+    if (!options.enabled) {
+      return;
+    }
+
+    metadata.context = {
+      ...metadata.context,
+      ...detail
+    };
+
+    queueWrite(async () => {
+      await ensureParentDirectories(options.metadataPath);
+      await writeFile(
+        options.metadataPath,
+        `${JSON.stringify(metadata, null, 2)}\n`,
+        'utf8'
+      );
+    });
+
+    await flush();
   }
 
   async function captureWindow(

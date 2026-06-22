@@ -6,11 +6,60 @@ import { createStartupDiagnostics } from './startup-diagnostics.js';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const SMOKE_TEST_TIMEOUT_MS = 15_000;
+const HEARTBEAT_INTERVAL_MS = 1_000;
 const startupDiagnostics = createStartupDiagnostics();
 let latestWindow: BrowserWindow | null = null;
+const startupVariant = process.env.BOCHKI_STARTUP_VARIANT ?? 'baseline';
 
 interface CreateMainWindowOptions {
   show?: boolean;
+}
+
+function applyStartupVariant(variant: string): void {
+  switch (variant) {
+    case 'baseline':
+      return;
+    case 'disable-hw-accel':
+      app.disableHardwareAcceleration();
+      return;
+    case 'disable-gpu':
+      app.commandLine.appendSwitch('disable-gpu');
+      return;
+    case 'disable-gpu-sandbox':
+      app.commandLine.appendSwitch('disable-gpu-sandbox');
+      return;
+    case 'no-browser-window':
+      return;
+    default:
+      throw new Error(`Unsupported startup variant: ${variant}`);
+  }
+}
+
+function safeGetPath(name: Parameters<typeof app.getPath>[0]): string | null {
+  try {
+    return app.getPath(name);
+  } catch {
+    return null;
+  }
+}
+
+function safeGetAppPath(): string | null {
+  try {
+    return app.getAppPath();
+  } catch {
+    return null;
+  }
+}
+
+function resolveAppliedSwitches(variant: string): string {
+  switch (variant) {
+    case 'disable-gpu':
+      return 'disable-gpu';
+    case 'disable-gpu-sandbox':
+      return 'disable-gpu-sandbox';
+    default:
+      return '';
+  }
 }
 
 async function createMainWindow(
@@ -60,6 +109,11 @@ async function createMainWindow(
 }
 
 async function runPackagedSmokeTest(): Promise<void> {
+  if (startupVariant === 'no-browser-window') {
+    await startupDiagnostics.mark('smoke:skip-browser-window');
+    return;
+  }
+
   await startupDiagnostics.mark('smoke:before-renderer-access-check');
   await access(join(currentDirectory, '../../renderer/index.html'));
   await startupDiagnostics.mark('smoke:after-renderer-access-check');
@@ -73,6 +127,11 @@ async function runApplication(): Promise<void> {
   await startupDiagnostics.mark('main:before-app-when-ready');
   await app.whenReady();
   await startupDiagnostics.mark('main:after-app-when-ready');
+  await startupDiagnostics.recordContext({
+    appPath: safeGetAppPath(),
+    appReadyAfterWhenReady: app.isReady(),
+    userDataPathAfterWhenReady: safeGetPath('userData')
+  });
 
   if (process.env.BOCHKI_SMOKE_TEST === '1') {
     await runPackagedSmokeTest();
@@ -83,8 +142,6 @@ async function runApplication(): Promise<void> {
   await startupDiagnostics.mark('main:initial-window-created');
 
   app.on('activate', () => {
-    void startupDiagnostics.mark('app:activate');
-
     if (BrowserWindow.getAllWindows().length === 0) {
       void createMainWindow();
     }
@@ -114,9 +171,26 @@ async function withTimeout<T>(
   }
 }
 
+startupDiagnostics.registerApp(app);
+startupDiagnostics.startHeartbeat(HEARTBEAT_INTERVAL_MS);
+applyStartupVariant(startupVariant);
+
 await startupDiagnostics.mark('process:entry', {
   diagnostic: startupDiagnostics.isEnabled,
-  smoke: process.env.BOCHKI_SMOKE_TEST === '1'
+  smoke: process.env.BOCHKI_SMOKE_TEST === '1',
+  variant: startupVariant
+});
+await startupDiagnostics.recordContext({
+  appPath: safeGetAppPath(),
+  appReadyAtEntry: app.isReady(),
+  argv: JSON.stringify(process.argv),
+  arch: process.arch,
+  execPath: process.execPath,
+  pid: process.pid,
+  platform: process.platform,
+  startupSwitches: resolveAppliedSwitches(startupVariant),
+  userDataPathAtEntry: safeGetPath('userData'),
+  variant: startupVariant
 });
 
 if (process.env.BOCHKI_SMOKE_TEST === '1') {

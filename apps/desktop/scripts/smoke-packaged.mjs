@@ -24,6 +24,16 @@ function getExpectedArch() {
   return process.argv[archIndex + 1];
 }
 
+function getStartupVariant() {
+  const variantIndex = process.argv.indexOf('--variant');
+
+  if (variantIndex === -1) {
+    return process.env.BOCHKI_STARTUP_VARIANT ?? 'baseline';
+  }
+
+  return process.argv[variantIndex + 1];
+}
+
 async function findApps(directory, depth = 0) {
   if (depth > 3) {
     return [];
@@ -116,11 +126,12 @@ async function assertDmgExists(expectedArch) {
   }
 }
 
-function resolveDiagnosticsPaths(expectedArch) {
+function resolveDiagnosticsPaths(expectedArch, startupVariant) {
   const diagnosticsDirectory = join(
     releaseDirectory,
     'diagnostics',
-    expectedArch
+    expectedArch,
+    startupVariant
   );
 
   return {
@@ -139,8 +150,12 @@ async function writeDiagnosticFile(path, content) {
   await writeFile(path, content, 'utf8');
 }
 
-async function assertPackagedAppLaunches(executablePath, expectedArch) {
-  const diagnostics = resolveDiagnosticsPaths(expectedArch);
+async function assertPackagedAppLaunches(
+  executablePath,
+  expectedArch,
+  startupVariant
+) {
+  const diagnostics = resolveDiagnosticsPaths(expectedArch, startupVariant);
   await mkdir(diagnostics.diagnosticsDirectory, { recursive: true });
 
   const env = {
@@ -149,7 +164,8 @@ async function assertPackagedAppLaunches(executablePath, expectedArch) {
     BOCHKI_STARTUP_DIAGNOSTIC: '1',
     BOCHKI_STARTUP_LOG_PATH: diagnostics.startupLogPath,
     BOCHKI_STARTUP_METADATA_PATH: diagnostics.metadataPath,
-    BOCHKI_STARTUP_SCREENSHOT_PATH: diagnostics.screenshotPath
+    BOCHKI_STARTUP_SCREENSHOT_PATH: diagnostics.screenshotPath,
+    BOCHKI_STARTUP_VARIANT: startupVariant
   };
 
   try {
@@ -220,6 +236,7 @@ async function assertPackagedAppLaunches(executablePath, expectedArch) {
 }
 
 const expectedArch = getExpectedArch();
+const startupVariant = getStartupVariant();
 
 if (!expectedArch) {
   throw new Error('Expected architecture is required. Pass --arch x64|arm64.');
@@ -239,4 +256,4 @@ const executablePath = await resolveExecutable(apps[0]);
 await assertExecutableArch(executablePath, expectedArch);
 await assertPackagedPayload(apps[0]);
 await assertDmgExists(expectedArch);
-await assertPackagedAppLaunches(executablePath, expectedArch);
+await assertPackagedAppLaunches(executablePath, expectedArch, startupVariant);
