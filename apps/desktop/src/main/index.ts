@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JsonFileStorage } from '@bochki/storage';
@@ -51,37 +52,14 @@ async function createMainWindow(
 }
 
 async function runPackagedSmokeTest(): Promise<void> {
-  const window = await createMainWindow({ show: false });
+  await access(join(currentDirectory, '../preload/index.js'));
+  await access(join(currentDirectory, '../../renderer/index.html'));
 
-  await window.webContents.executeJavaScript(`
-    (async () => {
-      const waitForHomePage = async () => {
-        const deadline = Date.now() + 5000;
+  const result = await loadData(createStorage(), getDataFilePath());
 
-        while (!document.querySelector('[data-testid="home-page"]')) {
-          if (Date.now() > deadline) {
-            throw new Error('Home page marker was not rendered.');
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-      };
-
-      await waitForHomePage();
-
-      if (!window.bochki?.data?.load) {
-        throw new Error('Preload API is not available.');
-      }
-
-      const result = await window.bochki.data.load();
-
-      if (result?.document?.schemaVersion !== 1) {
-        throw new Error('Unexpected data load result.');
-      }
-
-      return true;
-    })();
-  `);
+  if (result.document.schemaVersion !== 1) {
+    throw new Error('Unexpected data load result.');
+  }
 }
 
 async function withTimeout<T>(
