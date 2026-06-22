@@ -1,0 +1,46 @@
+# git
+
+## Разрешаем git-команды (первый аргумент "git", второй — один из списка)
+prefix_rule(
+    pattern=["git", ["add", "commit", "push", "pull", "fetch", "checkout", "branch", "tag"]],
+    decision="allow"
+)
+
+
+# gh
+
+## Разрешаем базовые команды gh
+prefix_rule(
+    pattern=["gh", ["repo"]],
+    decision="allow"
+)
+
+# Группируем подкоманды auth (gh auth ...)
+prefix_rule(
+    pattern=["gh", "auth", ["status"]],
+    decision="allow"
+)
+
+## Группируем подкоманды pull requests (gh pr ...)
+prefix_rule(
+    pattern=["gh", "pr", ["create", "view", "edit", "checks", "comment", "status", "ready", "reopen", "merge"]],
+    decision="allow"
+)
+
+## Группируем подкоманды GitHub Actions (gh run ...)
+prefix_rule(
+    pattern=["gh", "run", ["list", "watch", "view"]],
+    decision="allow"
+)
+
+## Группируем подкоманды воркфлоу (gh workflow ...)
+prefix_rule(
+    pattern=["gh", "workflow", ["list", "view"]],
+    decision="allow"
+)
+
+## Группируем подкоманды release (gh release ...)
+prefix_rule(
+    pattern=["gh", "release", ["view", "create"]],
+    decision="allow"
+)
