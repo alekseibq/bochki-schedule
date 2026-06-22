@@ -128,8 +128,40 @@ async function assertPackagedAppLaunches(executablePath) {
       timeout: 30_000
     });
   } catch (error) {
+    const details = [];
+
+    if (error && typeof error === 'object') {
+      if ('code' in error && error.code) {
+        details.push(`code=${String(error.code)}`);
+      }
+
+      if ('signal' in error && error.signal) {
+        details.push(`signal=${String(error.signal)}`);
+      }
+
+      if ('killed' in error && error.killed) {
+        details.push('killed=true');
+      }
+
+      if (
+        'stdout' in error &&
+        typeof error.stdout === 'string' &&
+        error.stdout
+      ) {
+        details.push(`stdout=${error.stdout.trim()}`);
+      }
+
+      if (
+        'stderr' in error &&
+        typeof error.stderr === 'string' &&
+        error.stderr
+      ) {
+        details.push(`stderr=${error.stderr.trim()}`);
+      }
+    }
+
     throw new Error(
-      `Packaged app failed to launch in smoke mode: ${error instanceof Error ? error.message : String(error)}`
+      `Packaged app failed to launch in smoke mode: ${error instanceof Error ? error.message : String(error)}${details.length > 0 ? ` (${details.join('; ')})` : ''}`
     );
   }
 }

@@ -64,9 +64,6 @@ jobs:
       - name: Package macOS
         run: pnpm --filter @bochki/desktop run ${{ matrix.package_script }}
 
-      - name: Smoke packaged app
-        run: pnpm --filter @bochki/desktop run smoke:packaged -- --arch ${{ matrix.arch }}
-
       - name: Rename DMG
         id: dmg
         shell: bash
@@ -90,3 +87,6 @@ jobs:
           name: diagnostic-zero-macos-dmg-${{ matrix.arch }}-${{ steps.diagnostic.outputs.file_version }}
           path: ${{ steps.dmg.outputs.path }}
           if-no-files-found: error
+
+      - name: Smoke packaged app
+        run: pnpm --filter @bochki/desktop run smoke:packaged -- --arch ${{ matrix.arch }}
