@@ -8,6 +8,8 @@
     "build": "pnpm --filter @bochki/domain build && pnpm --filter @bochki/storage build && pnpm --filter @bochki/ui build && pnpm --filter @bochki/desktop build",
     "dev": "pnpm --filter @bochki/desktop dev",
     "qa:desktop": "pnpm --filter @bochki/desktop dev:qa",
+    "ship:pr": "bash scripts/agent/ship-pr.sh --mode auto-fix",
+    "ship:pr:no-fix": "bash scripts/agent/ship-pr.sh --mode no-fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
