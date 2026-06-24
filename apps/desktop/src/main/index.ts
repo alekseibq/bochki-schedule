@@ -1,65 +1,60 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
-import { access } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { JsonFileStorage } from '@bochki/storage';
-import { loadData } from './data.js';
-import { resolveDataFilePath } from './paths.js';
+import { app } from 'electron';
+import { createStartupDiagnostics } from './startup-diagnostics.js';
 
-const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const SMOKE_TEST_TIMEOUT_MS = 15_000;
+const DEFAULT_SMOKE_TEST_TIMEOUT_MS = 15_000;
+const HEARTBEAT_INTERVAL_MS = 1_000;
+const startupDiagnostics = createStartupDiagnostics();
+const startupVariant = process.env.BOCHKI_STARTUP_VARIANT ?? 'ultra-minimal';
 
-interface CreateMainWindowOptions {
-  show?: boolean;
-}
+function resolveSmokeTestTimeoutMs(): number {
+  const value = Number.parseInt(
+    process.env.BOCHKI_SMOKE_TEST_TIMEOUT_MS ?? '',
+    10
+  );
 
-function getDataFilePath(): string {
-  const dataDirectory = process.env.BOCHKI_DATA_DIR ?? app.getPath('userData');
-  return resolveDataFilePath(dataDirectory);
-}
-
-function createStorage(): JsonFileStorage {
-  return new JsonFileStorage({
-    dataFilePath: getDataFilePath(),
-    keepBackup: true
-  });
-}
-
-async function createMainWindow(
-  options: CreateMainWindowOptions = {}
-): Promise<BrowserWindow> {
-  const window = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
-    show: options.show ?? true,
-    title: 'Bochki Schedule',
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: join(currentDirectory, '../preload/index.js')
-    }
-  });
-
-  if (process.env.VITE_DEV_SERVER_URL) {
-    await window.loadURL(process.env.VITE_DEV_SERVER_URL);
-  } else {
-    await window.loadFile(join(currentDirectory, '../../renderer/index.html'));
+  if (!Number.isFinite(value) || value <= 0) {
+    return DEFAULT_SMOKE_TEST_TIMEOUT_MS;
   }
 
-  return window;
+  return value;
+}
+
+function safeGetPath(name: Parameters<typeof app.getPath>[0]): string | null {
+  try {
+    return app.getPath(name);
+  } catch {
+    return null;
+  }
+}
+
+function safeGetAppPath(): string | null {
+  try {
+    return app.getAppPath();
+  } catch {
+    return null;
+  }
 }
 
 async function runPackagedSmokeTest(): Promise<void> {
-  await access(join(currentDirectory, '../preload/index.js'));
-  await access(join(currentDirectory, '../../renderer/index.html'));
+  await startupDiagnostics.mark('smoke:ultra-minimal-no-window');
+}
 
-  const result = await loadData(createStorage(), getDataFilePath());
+async function runApplication(): Promise<void> {
+  await startupDiagnostics.mark('main:before-app-when-ready');
+  await app.whenReady();
+  await startupDiagnostics.mark('main:after-app-when-ready');
+  await startupDiagnostics.recordContext({
+    appPath: safeGetAppPath(),
+    appReadyAfterWhenReady: app.isReady(),
+    userDataPathAfterWhenReady: safeGetPath('userData')
+  });
 
-  if (result.document.schemaVersion !== 2) {
-    throw new Error('Unexpected data load result.');
+  if (process.env.BOCHKI_SMOKE_TEST === '1') {
+    await runPackagedSmokeTest();
+    return;
   }
+
+  await startupDiagnostics.mark('main:ultra-minimal-ready');
 }
 
 async function withTimeout<T>(
@@ -85,32 +80,47 @@ async function withTimeout<T>(
   }
 }
 
-ipcMain.handle('data:load', async () =>
-  loadData(createStorage(), getDataFilePath())
-);
+startupDiagnostics.registerApp(app);
+startupDiagnostics.startHeartbeat(HEARTBEAT_INTERVAL_MS);
 
-await app.whenReady();
+await startupDiagnostics.mark('process:entry', {
+  diagnostic: startupDiagnostics.isEnabled,
+  smoke: process.env.BOCHKI_SMOKE_TEST === '1',
+  variant: startupVariant
+});
+await startupDiagnostics.recordContext({
+  appPath: safeGetAppPath(),
+  appReadyAtEntry: app.isReady(),
+  argv: JSON.stringify(process.argv),
+  arch: process.arch,
+  execPath: process.execPath,
+  pid: process.pid,
+  platform: process.platform,
+  startupSwitches: '',
+  userDataPathAtEntry: safeGetPath('userData'),
+  variant: startupVariant
+});
 
 if (process.env.BOCHKI_SMOKE_TEST === '1') {
   try {
-    await withTimeout(runPackagedSmokeTest(), SMOKE_TEST_TIMEOUT_MS);
+    await withTimeout(runApplication(), resolveSmokeTestTimeoutMs());
+    await startupDiagnostics.mark('smoke:completed');
+    await startupDiagnostics.flush();
     app.exit(0);
   } catch (error) {
+    await startupDiagnostics.mark('smoke:failed', {
+      message: error instanceof Error ? error.message : String(error)
+    });
+    await startupDiagnostics.flush();
     console.error('Packaged smoke test failed.', error);
     app.exit(1);
   }
 } else {
-  await createMainWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      void createMainWindow();
-    }
-  });
+  await runApplication();
 }
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  void startupDiagnostics.mark('app:window-all-closed', {
+    platform: process.platform
+  });
 });

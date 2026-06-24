@@ -1,0 +1,102 @@
+name: Diagnostic Zero macOS
+
+on:
+  push:
+    branches:
+      - feat/zero-startup-diagnostic
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-mac:
+    name: Diagnostic macOS ${{ matrix.arch }} / ${{ matrix.variant }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-15-intel
+            package_script: package:mac:x64
+            variant: ultra-minimal
+          - arch: arm64
+            runner: macos-latest
+            package_script: package:mac:arm64
+            variant: ultra-minimal
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve diagnostic metadata
+        id: diagnostic
+        shell: bash
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          SAFE_REF="$(echo "${GITHUB_REF_NAME}" | tr -c '[:alnum:]._-' '-')"
+          VERSION="0.0.0-dev"
+          FILE_VERSION="zero-${SAFE_REF}-${SHORT_SHA}"
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "file_version=${FILE_VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set desktop package version
+        run: |
+          node -e "const fs = require('node:fs'); const path = 'apps/desktop/package.json'; const pkg = JSON.parse(fs.readFileSync(path, 'utf8')); pkg.version = process.argv[1]; fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');" "${{ steps.diagnostic.outputs.version }}"
+
+      - name: Build
+        run: pnpm build
+
+      - name: Package macOS
+        run: pnpm --filter @bochki/desktop run ${{ matrix.package_script }}
+
+      - name: Rename DMG
+        id: dmg
+        shell: bash
+        run: |
+          OUTPUT_DIR="apps/desktop/release"
+          SOURCE="$(find "${OUTPUT_DIR}" -maxdepth 1 -type f -name 'Bochki-Schedule-*-mac-${{ matrix.arch }}.dmg' -print -quit)"
+
+          if [[ -z "${SOURCE}" ]]; then
+            echo "No DMG found for ${{ matrix.arch }} in ${OUTPUT_DIR}" >&2
+            find "${OUTPUT_DIR}" -maxdepth 2 -type f >&2
+            exit 1
+          fi
+
+          TARGET="${OUTPUT_DIR}/Bochki-Schedule-${{ steps.diagnostic.outputs.file_version }}-mac-${{ matrix.arch }}.dmg"
+          mv "${SOURCE}" "${TARGET}"
+          echo "path=${TARGET}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload diagnostic macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-zero-macos-dmg-${{ matrix.arch }}-${{ steps.diagnostic.outputs.file_version }}
+          path: ${{ steps.dmg.outputs.path }}
+          if-no-files-found: error
+
+      - name: Smoke packaged app
+        run: pnpm --filter @bochki/desktop run smoke:packaged -- --arch ${{ matrix.arch }} --variant ${{ matrix.variant }}
+
+      - name: Upload startup diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-zero-startup-${{ matrix.arch }}-${{ matrix.variant }}-${{ steps.diagnostic.outputs.file_version }}
+          path: apps/desktop/release/diagnostics/${{ matrix.arch }}/${{ matrix.variant }}
+          if-no-files-found: warn

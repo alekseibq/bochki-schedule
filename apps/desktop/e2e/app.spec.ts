@@ -6,28 +6,6 @@ test.skip(
 );
 
 test('opens dictionary sections from the top menu', async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(window, 'bochki', {
-      configurable: true,
-      value: {
-        data: {
-          load: async () => ({
-            createdFromEmpty: false,
-            document: {
-              schemaVersion: 2,
-              dictionaries: {
-                participants: [],
-                trainers: [],
-                procedureTypes: []
-              },
-              seminars: []
-            }
-          })
-        }
-      }
-    });
-  });
-
   await page.goto('/');
   await expect(page.getByTestId('home-page')).toBeVisible();
 
