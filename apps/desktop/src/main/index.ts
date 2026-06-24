@@ -1,10 +1,23 @@
 import { app } from 'electron';
 import { createStartupDiagnostics } from './startup-diagnostics.js';
 
-const SMOKE_TEST_TIMEOUT_MS = 15_000;
+const DEFAULT_SMOKE_TEST_TIMEOUT_MS = 15_000;
 const HEARTBEAT_INTERVAL_MS = 1_000;
 const startupDiagnostics = createStartupDiagnostics();
 const startupVariant = process.env.BOCHKI_STARTUP_VARIANT ?? 'ultra-minimal';
+
+function resolveSmokeTestTimeoutMs(): number {
+  const value = Number.parseInt(
+    process.env.BOCHKI_SMOKE_TEST_TIMEOUT_MS ?? '',
+    10
+  );
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return DEFAULT_SMOKE_TEST_TIMEOUT_MS;
+  }
+
+  return value;
+}
 
 function safeGetPath(name: Parameters<typeof app.getPath>[0]): string | null {
   try {
@@ -90,7 +103,7 @@ await startupDiagnostics.recordContext({
 
 if (process.env.BOCHKI_SMOKE_TEST === '1') {
   try {
-    await withTimeout(runApplication(), SMOKE_TEST_TIMEOUT_MS);
+    await withTimeout(runApplication(), resolveSmokeTestTimeoutMs());
     await startupDiagnostics.mark('smoke:completed');
     await startupDiagnostics.flush();
     app.exit(0);

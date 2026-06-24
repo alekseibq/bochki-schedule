@@ -9,6 +9,8 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const desktopRoot = fileURLToPath(new URL('../', import.meta.url));
 const releaseDirectory = join(desktopRoot, 'release');
+const PACKAGED_SMOKE_TIMEOUT_MS = 15_000;
+const APP_INTERNAL_SMOKE_TIMEOUT_MS = 60_000;
 
 const archAliases = {
   arm64: 'arm64',
@@ -171,6 +173,7 @@ async function assertPackagedAppLaunches(
   const env = {
     ...process.env,
     BOCHKI_SMOKE_TEST: '1',
+    BOCHKI_SMOKE_TEST_TIMEOUT_MS: String(APP_INTERNAL_SMOKE_TIMEOUT_MS),
     BOCHKI_STARTUP_DIAGNOSTIC: '1',
     BOCHKI_STARTUP_LOG_PATH: diagnostics.startupLogPath,
     BOCHKI_STARTUP_METADATA_PATH: diagnostics.metadataPath,
@@ -196,10 +199,15 @@ async function assertPackagedAppLaunches(
   });
 
   try {
-    const exit = await waitForChild(child, diagnostics, 30_000, () => {
-      timeoutTriggered = true;
-      return captureSystemDiagnostics(child.pid, diagnostics);
-    });
+    const exit = await waitForChild(
+      child,
+      diagnostics,
+      PACKAGED_SMOKE_TIMEOUT_MS,
+      () => {
+        timeoutTriggered = true;
+        return captureSystemDiagnostics(child.pid, diagnostics);
+      }
+    );
 
     await writeDiagnosticFile(diagnostics.stdoutPath, stdout);
     await writeDiagnosticFile(diagnostics.stderrPath, stderr);
